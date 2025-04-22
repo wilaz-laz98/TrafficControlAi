@@ -1,0 +1,16 @@
+from enum import Enum
+
+
+class Sizes() :
+    WIDTH = 700
+    HEIGHT = 700
+    ROAD_WIDTH = 300
+    ROAD_HEIGHT = 200
+    TRAFFIC_LIGHT_WIDTH = 20
+    TRAFFIC_LIGHT_HEIGHT = 80
+    CAR_SIZE = 20
+    CAR_SPEED = 2
+    SPAWN_RATE = 0.05
+    SPAWN_RANGE = 800, 2000
+    TURN_PROBABILITY = 0.4
+    FPS = 60
