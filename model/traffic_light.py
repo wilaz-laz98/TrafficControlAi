@@ -14,19 +14,18 @@ class TrafficLight:
             self.state = Colors.RED
         elif self.direction in [Directions.EAST, Directions.WEST]:
             self.state = Colors.GREEN
-        self.last_change = pygame.time.get_ticks()
-
-        # Set the position of the traffic light based on its direction
-        if self.direction == Directions.NORTH:
-            self.rect.topleft = (Sizes.WIDTH // 2 - Sizes.ROAD_WIDTH // 2 - Sizes.TRAFFIC_LIGHT_WIDTH - 30, Sizes.ROAD_HEIGHT - Sizes.TRAFFIC_LIGHT_HEIGHT - 30)
-        elif self.direction == Directions.SOUTH:
-            self.rect.topleft = (Sizes.WIDTH // 2 + Sizes.ROAD_WIDTH // 2 + 30, Sizes.HEIGHT // 2 + Sizes.ROAD_WIDTH // 2 + 30)
-        elif self.direction == Directions.EAST:
-            self.rect.topleft = (Sizes.WIDTH // 2 + Sizes.ROAD_WIDTH // 2 + 30, Sizes.HEIGHT // 2 - Sizes.ROAD_WIDTH // 2 - Sizes.TRAFFIC_LIGHT_WIDTH - 30)
-        elif self.direction == Directions.WEST:
-            self.rect.topleft = (Sizes.WIDTH // 2 - Sizes.ROAD_WIDTH // 2 - Sizes.TRAFFIC_LIGHT_HEIGHT - 30, Sizes.HEIGHT // 2 + Sizes.ROAD_WIDTH // 2 + Sizes.TRAFFIC_LIGHT_WIDTH)
 
 
+    # def set_position(self):
+    #     # Set the position of the traffic light based on its direction
+    #     if self.direction == Directions.NORTH:
+    #         self.rect.topleft = (Sizes.WIDTH // 2 - Sizes.ROAD_WIDTH // 2 - Sizes.TRAFFIC_LIGHT_WIDTH - 30, Sizes.ROAD_HEIGHT - Sizes.TRAFFIC_LIGHT_HEIGHT - 30)
+    #     elif self.direction == Directions.SOUTH:
+    #         self.rect.topleft = (Sizes.WIDTH // 2 + Sizes.ROAD_WIDTH // 2 + 30, Sizes.HEIGHT // 2 + Sizes.ROAD_WIDTH // 2 + 30)
+    #     elif self.direction == Directions.EAST:
+    #         self.rect.topleft = (Sizes.WIDTH // 2 + Sizes.ROAD_WIDTH // 2 + 30, Sizes.HEIGHT // 2 - Sizes.ROAD_WIDTH // 2 - Sizes.TRAFFIC_LIGHT_WIDTH - 30)
+    #     elif self.direction == Directions.WEST:
+    #         self.rect.topleft = (Sizes.WIDTH // 2 - Sizes.ROAD_WIDTH // 2 - Sizes.TRAFFIC_LIGHT_HEIGHT - 30, Sizes.HEIGHT // 2 + Sizes.ROAD_WIDTH // 2 + Sizes.TRAFFIC_LIGHT_WIDTH)
 
     def draw(self, screen):
         # Update traffic color based on state

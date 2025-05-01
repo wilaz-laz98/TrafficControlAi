@@ -1,6 +1,6 @@
 import random
 import pygame
-from math import cos, radians, sin
+import math
 from utils.colors import Colors
 from utils.sizes import Sizes
 from utils.directions import Directions
@@ -8,119 +8,142 @@ from utils.turn_state import TurnState
 
 
 class Car:
-    def __init__(self, direction):
-        self.direction = direction
+    def __init__(self, road, lane):
+        self.road = road
+        self.target_road = self.get_target_road()
+
+        self.lane = lane
+
+        self.image = pygame.image.load("assets/images/car.png").convert_alpha()
+        self.rect = self.image.get_rect(center=self.get_initial_position())
         self.color = (random.randint(100, 255), random.randint(100, 255), random.randint(100, 255))
+
         self.waiting_time = 0.0
         self.total_wait = 0.0
-        self.turn = random.choice([TurnState.STRAIGHT, TurnState.TURNING])
-        self.turn_direction = None
-        self.turn_progress = 0
-        self.angle = 0
-        self.set_initial_position()
-        self.set_turn_direction()
-
-    def set_initial_position(self):
-        offset = Sizes.CAR_SIZE * 3
-        if self.direction == Directions.NORTH:
-            self.x = Sizes.WIDTH // 2 + Sizes.ROAD_WIDTH // 4
-            self.y = Sizes.HEIGHT + offset
-        elif self.direction == Directions.SOUTH:
-            self.x = Sizes.WIDTH // 2 - Sizes.ROAD_WIDTH // 4
-            self.y = -offset
-        elif self.direction == Directions.EAST:
-            self.x = -offset
-            self.y = Sizes.HEIGHT // 2 + Sizes.ROAD_WIDTH // 4
-        elif self.direction == Directions.WEST:
-            self.x = Sizes.WIDTH + offset
-            self.y = Sizes.HEIGHT // 2 - Sizes.ROAD_WIDTH // 4
-
-    def set_turn_direction(self):
-        if self.turn == TurnState.TURNING:
-            if self.direction in [Directions.NORTH, Directions.SOUTH]:
-                self.turn_direction = random.choice([Directions.EAST, Directions.WEST])
-            else:
-                self.turn_direction = random.choice([Directions.NORTH, Directions.SOUTH])
-
-    def calculate_turn_radius(self):
-        if self.direction == [Directions.NORTH, Directions.SOUTH]:
-            return Sizes.ROAD_WIDTH // 2
-        return Sizes.ROAD_WIDTH // 2
-
-    def update_turn(self):
-        if self.turn != TurnState.TURNING or self.turn_progress >= 90:
-            self.turn = TurnState.COMPLETED
-            return
-        
-        radius = self.calculate_turn_radius()
-        self.angle += 3
-        self.turn_progress += 3
-
-        if self.direction == Directions.NORTH:
-            if self.turn_direction == Directions.EAST:
-                self.x += radius * (1 - cos(radians(self.angle)))
-                self.y -= radius * sin(radians(self.angle))
-            else:
-                self.x -= radius * (1 - cos(radians(self.angle)))
-                self.y -= radius * sin(radians(self.angle))
-        elif self.direction == Directions.SOUTH:
-            if self.turn_direction == Directions.EAST:
-                self.x += radius * (1 - cos(radians(self.angle)))
-                self.y += radius * sin(radians(self.angle))
-            else:
-                self.x -= radius * (1 - cos(radians(self.angle)))
-                self.y += radius * sin(radians(self.angle))
-        elif self.direction == Directions.EAST:
-            if self.turn_direction == Directions.NORTH:
-                self.x += radius * (1 - cos(radians(self.angle)))
-                self.y -= radius * sin(radians(self.angle))
-            else:
-                self.x += radius * (1 - cos(radians(self.angle)))
-                self.y += radius * sin(radians(self.angle))
-        elif self.direction == Directions.WEST:
-            if self.turn_direction == Directions.NORTH:
-                self.x -= radius * (1 - cos(radians(self.angle)))
-                self.y -= radius * sin(radians(self.angle))
-            else:
-                self.x -= radius * (1 - cos(radians(self.angle)))
-                self.y += radius * sin(radians(self.angle))
-
-    def move(self, delta_time, light_state):
-        if light_state != Colors.GREEN:
-            self.waiting_time += delta_time
-            self.waiting = True
-            return
         self.waiting = False
-        self.total_wait += self.waiting_time
+
+        self.turn_progress = 0
+        self.speed = random.uniform(100, 200)
+        self.angle = self.calculate_rotation()
+
+    def calculate_rotation(self):
+        return {
+            Directions.NORTH: 90,
+            Directions.EAST: 0,
+            Directions.SOUTH: 270,
+            Directions.WEST: 180
+        }[self.road.direction]
+
+    def get_initial_position(self):
+        return self.road.spawn_positions[self.lane]
+
+    def get_opposite_direction(self):
+        return {
+            Directions.NORTH: Directions.SOUTH,
+            Directions.SOUTH: Directions.NORTH,
+            Directions.EAST: Directions.WEST,
+            Directions.WEST: Directions.EAST
+        }[self.road.direction]
+
+    def get_target_road(self):
+        # 70% straight, 30% turn right
+        if random.random() < 0.7:
+            return self.get_opposite_direction()
+        return random.choice([d for d in Directions if d not in
+                            (self.road.direction, self.get_opposite_direction())])
+
+    def update_position(self, dt, light_state, cars):
+        # store normal speed if not already set
+        if not hasattr(self, 'normal_speed'):
+            self.normal_speed = self.speed
+
+        # find relevant car ahead information
+        car_ahead, axial_distance = self.get_closest_car_ahead(cars)
+        stop_at_light = self.need_to_stop_at_light(light_state)
+
+        # initialize default speed
+        self.speed = self.normal_speed
+
+        # decision logic
+        if stop_at_light:
+            self.speed = 0
+            self.waiting = True
+            self.waiting_time += dt
+        elif car_ahead:
+            # dynamic speed adjustment for moving car
+            safe_distance = 30
+            if axial_distance < safe_distance:
+                # reduce speed proportionally to distance
+                speed_reduction = (safe_distance - axial_distance)/ safe_distance
+                self.speed = max(0,self.normal_speed * (1-speed_reduction))
+                self.speed = min(self.speed, car_ahead.speed)
+
+        # movement handeling
+        self.waiting = False
         self.waiting_time = 0.0
 
-        if self.turn == TurnState.TURNING:
-            self.update_turn()
+        if self.speed > 0 :
+            # update position based on direction using current speed
+            if self.road.direction == Directions.NORTH:
+                self.rect.y += self.speed * dt
+            elif self.road.direction == Directions.SOUTH:
+                self.rect.y -= self.speed * dt
+            elif self.road.direction == Directions.EAST:
+                self.rect.x -= self.speed * dt
+            else: #west
+                self.rect.x += self.speed * dt
+
+    def get_closest_car_ahead(self, cars):
+        closest_car = None
+        min_distance = float('inf')
+
+        for car in cars:
+            if (car is self or
+                car.road != self.road or
+                car.lane != self.lane or
+                not self.is_ahead(car)):
+                continue
+
+            distance = self.calculate_axial_distance_to(car)
+            if distance < min_distance:
+                min_distance = distance
+                closest_car = car
+        return closest_car, min_distance
+
+    def is_ahead(self, other_car):
+        if self.road.direction == Directions.NORTH:
+            return other_car.rect.centery > self.rect.centery
+        elif self.road.direction == Directions.SOUTH:
+            return other_car.rect.centery < self.rect.centery
+        elif self.road.direction == Directions.EAST:
+            return other_car.rect.centerx < self.rect.centerx
+        elif self.road.direction == Directions.WEST:
+            return other_car.rect.centerx > self.rect.centerx
+
+    def calculate_axial_distance_to(self, other_car):
+        if self.road.direction in [Directions.NORTH, Directions.SOUTH]:
+            return abs(self.rect.centery - other_car.rect.centery)
         else:
-            if self.direction == Directions.NORTH:
-                self.y -= Sizes.CAR_SPEED
-            elif self.direction == Directions.SOUTH:
-                self.y += Sizes.CAR_SPEED
-            elif self.direction == Directions.EAST:
-                self.x += Sizes.CAR_SPEED
-            elif self.direction == Directions.WEST:
-                self.x -= Sizes.CAR_SPEED
+            return abs(self.rect.centerx - other_car.rect.centerx)
 
-        if self.should_initiate_turn():
-            self.turn = TurnState.TURNING
+    def need_to_stop_at_light(self, light_state):
+        if light_state != Colors.RED or not self.rect.colliderect(self.road.rect):
+            return False
 
-    def should_initiate_turn(self):
-        buffer = 20
-        intersection_center = (Sizes.WIDTH // 2, Sizes.HEIGHT // 2)
-        return (
-            abs(self.x - intersection_center[0]) < buffer and
-            abs(self.y - intersection_center[1]) < buffer
-        )
+        stop_distance = 10
+        if self.road.direction == Directions.NORTH:
+            return self.rect.bottom > (self.road.stop_line - stop_distance)
+        elif self.road.direction == Directions.SOUTH:
+            return self.rect.top < (self.road.stop_line + stop_distance)
+        elif self.road.direction == Directions.EAST:
+            return self.rect.left < (self.road.stop_line + stop_distance)
+        elif self.road.direction == Directions.WEST:
+            return self.rect.right > (self.road.stop_line - stop_distance)
 
-    def is_off_screen(self):
-        return any([
-            self.x < -Sizes.CAR_SIZE * 3,
-            self.x > Sizes.WIDTH + Sizes.CAR_SIZE * 3,
-            self.y < -Sizes.CAR_SIZE * 3,
-            self.y > Sizes.HEIGHT + Sizes.CAR_SIZE * 3
-        ])
+    def out_of_bounds(self):
+        return not self.rect.colliderect(0, 0, Sizes.WIDTH, Sizes.HEIGHT)
+
+    def draw(self, screen):
+        rotated = pygame.transform.rotate(self.image, self.angle)
+        rect = rotated.get_rect(center=self.rect.center)
+        screen.blit(rotated, rect.topleft)
