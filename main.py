@@ -38,29 +38,33 @@ def main():
     pygame.display.set_caption("Traffic Simulation")
     clock = pygame.time.Clock()
 
-    Roads = {
-        Directions.NORTH: Road(Directions.NORTH, TrafficLight(Directions.NORTH, "assets/images/light_north.png"), Crosswalk(Directions.NORTH, "assets/images/crosswalk_north.png"), "assets/images/road_north.png"),
-        Directions.SOUTH: Road(Directions.SOUTH, TrafficLight(Directions.SOUTH, "assets/images/light_south.png"), Crosswalk(Directions.SOUTH, "assets/images/crosswalk_south.png"), "assets/images/road_south.png"),
-        Directions.EAST: Road(Directions.EAST, TrafficLight(Directions.EAST, "assets/images/light_east.png"), Crosswalk(Directions.EAST, "assets/images/crosswalk_east.png"), "assets/images/road_east.png"),
-        Directions.WEST: Road(Directions.WEST, TrafficLight(Directions.WEST, "assets/images/light_west.png"), Crosswalk(Directions.WEST, "assets/images/crosswalk_west.png"), "assets/images/road_west.png")
-    }
-    car_spawn_prob_distributions = {
-        Directions.NORTH: lambda: random.random() < 0.02,
-        Directions.SOUTH: lambda: random.random() < 0.015,
-        Directions.EAST: lambda: random.random() < 0.01,
-        Directions.WEST: lambda: random.random() < 0.005,
+    # Intersection blocs
+    center = Sizes.WIDTH//2, Sizes.HEIGHT//2
+    nw = pygame.image.load("assets/images/nw_bloc.png").convert_alpha()
+    ne = pygame.image.load("assets/images/ne_bloc.png").convert_alpha()
+    sw = pygame.image.load("assets/images/sw_bloc.png").convert_alpha()
+    se = pygame.image.load("assets/images/se_bloc.png").convert_alpha()
+    Blocs = {
+        "north_west": nw.get_rect(bottomright = center),
+        "north_east": ne.get_rect(bottomleft = center),
+        "south_west": sw.get_rect(topright = center),
+        "south_east": se.get_rect(topleft = center),
     }
 
-    # # Intersection blocks rects
-    # block_width = Sizes.ROAD_WIDTH // 2
-    # block_north_west = pygame.Rect(
-    #     road_west_rect.right, road_north_rect.bottom, block_width, block_width)
-    # block_north_east = pygame.Rect(
-    #     road_east_rect.left - block_width, road_north_rect.bottom, block_width, block_width)
-    # block_south_west = pygame.Rect(
-    #     road_west_rect.right, road_south_rect.top - block_width, block_width, block_width)
-    # block_south_east = pygame.Rect(
-    #     road_east_rect.left - block_width, road_south_rect.top - block_width, block_width, block_width)
+    # Roads
+    Roads = {
+        Directions.NORTH: Road(Directions.NORTH, TrafficLight(Directions.NORTH, "assets/images/light_north.png"), Crosswalk(Directions.NORTH, "assets/images/crosswalk_north.png"), "assets/images/road_north.png",Blocs["north_west"], Blocs["south_west"], Blocs['north_east'], Blocs["south_east"]),
+        Directions.SOUTH: Road(Directions.SOUTH, TrafficLight(Directions.SOUTH, "assets/images/light_south.png"), Crosswalk(Directions.SOUTH, "assets/images/crosswalk_south.png"), "assets/images/road_south.png", Blocs["south_east"], Blocs["north_east"], Blocs["south_west"], Blocs["north_west"]),
+        Directions.EAST: Road(Directions.EAST, TrafficLight(Directions.EAST, "assets/images/light_east.png"), Crosswalk(Directions.EAST, "assets/images/crosswalk_east.png"), "assets/images/road_east.png", Blocs["north_east"], Blocs["north_west"], Blocs["south_east"], Blocs["south_west"]),
+        Directions.WEST: Road(Directions.WEST, TrafficLight(Directions.WEST, "assets/images/light_west.png"), Crosswalk(Directions.WEST, "assets/images/crosswalk_west.png"), "assets/images/road_west.png", Blocs["south_west"], Blocs["south_east"], Blocs["north_west"], Blocs["north_east"])
+    }
+
+    car_spawn_prob_distributions = {
+        Directions.NORTH: lambda: random.random() < 0.5,
+        Directions.SOUTH: lambda: random.random() < 0.015,
+        Directions.EAST: lambda: random.random() < 0.5,
+        Directions.WEST: lambda: random.random() < 0.005,
+    }
 
     # Phases
     phases = [
@@ -120,6 +124,12 @@ def main():
         # Draw background
         screen.fill(Colors.GRAY)
 
+        # Draw intersection blocs
+        screen.blit(nw, Blocs["north_west"])
+        screen.blit(ne, Blocs["north_east"])
+        screen.blit(sw, Blocs["south_west"])
+        screen.blit(se, Blocs["south_east"])
+
         # Draw roads and traffic lights
         for road in Roads.values():
             road.draw(screen)
@@ -130,18 +140,8 @@ def main():
         for car in cars:
             car.draw(screen)
 
-
-
         # Draw metrics
         draw_metrics(screen, cars)
-
-
-        # # Draw intersection blocks
-        # pygame.draw.rect(screen, Colors.BLACK, block_north_west)
-        # pygame.draw.rect(screen, Colors.BLACK, block_north_east)
-        # pygame.draw.rect(screen, Colors.BLACK, block_south_west)
-        # pygame.draw.rect(screen, Colors.BLACK, block_south_east)
-
 
         pygame.display.flip()
         clock.tick(Sizes.FPS)

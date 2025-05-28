@@ -9,13 +9,17 @@ from utils.sizes import Sizes
 
 
 class Road:
-    def __init__(self, direction, traffic_light, crosswalk, image, num_lanes = 2):
+    def __init__(self, direction, traffic_light, crosswalk, image, immediate_bloc, after_immediate, adjacent, diagonal, num_lanes = 2):
         self.direction = direction
         self.traffic_light = traffic_light
         self.crosswalk = crosswalk
 
-        self.num_lanes = num_lanes
+        self.immediate = immediate_bloc
+        self.after_immediate = after_immediate
+        self.adjacent = adjacent
+        self.diagonal = diagonal
 
+        self.num_lanes = num_lanes
 
         self.image = pygame.image.load(image).convert_alpha()
         self.rect = self.image.get_rect()

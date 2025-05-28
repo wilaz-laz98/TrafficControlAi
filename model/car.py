@@ -4,7 +4,6 @@ import math
 from utils.colors import Colors
 from utils.sizes import Sizes
 from utils.directions import Directions
-from utils.turn_state import TurnState
 
 
 class Car:
@@ -22,9 +21,13 @@ class Car:
         self.total_wait = 0.0
         self.waiting = False
 
-        self.turn_progress = 0
-        self.speed = random.uniform(100, 200)
+        self.speed = random.uniform(25, 60)
+        self.deceleration_rate = random.uniform(10, 15)
+        self.acceleration_rate = random.uniform(0.5, 1.5)
         self.angle = self.calculate_rotation()
+        self.awareness_rect_image = pygame.image.load(
+            "assets/images/awareness_rect.png").convert_alpha()
+        self.awareness_rect = self.get_awareness_rect()
 
     def calculate_rotation(self):
         return {
@@ -33,6 +36,10 @@ class Car:
             Directions.SOUTH: 270,
             Directions.WEST: 180
         }[self.road.direction]
+
+    def get_awareness_rect(self):
+        self.awareness_rect_image = pygame.transform.rotate(self.awareness_rect_image, self.angle)
+        return self.awareness_rect_image.get_rect(center = self.rect.center)
 
     def get_initial_position(self):
         return self.road.spawn_positions[self.lane]
@@ -57,30 +64,29 @@ class Car:
         if not hasattr(self, 'normal_speed'):
             self.normal_speed = self.speed
 
-        # find relevant car ahead information
-        car_ahead, axial_distance = self.get_closest_car_ahead(cars)
+        # find relevant car information
         stop_at_light = self.need_to_stop_at_light(light_state)
+        stop_car_ahead = self.need_to_stop_car_ahead(cars)
+        stop_for_priority = self.need_to_stop_priority(cars)
+        car_across = self.car_across(cars)
+        # stop_for_turn = self.need_to_stop_for_turn()
 
         # initialize default speed
-        self.speed = self.normal_speed
+        # self.speed = self.normal_speed
 
         # decision logic
-        if stop_at_light:
-            self.speed = 0
-            self.waiting = True
-            self.waiting_time += dt
-        elif car_ahead:
-            # dynamic speed adjustment for moving car
-            safe_distance = 30
-            if axial_distance < safe_distance:
-                # reduce speed proportionally to distance
-                speed_reduction = (safe_distance - axial_distance)/ safe_distance
-                self.speed = max(0,self.normal_speed * (1-speed_reduction))
-                self.speed = min(self.speed, car_ahead.speed)
+        if stop_at_light or stop_car_ahead or stop_for_priority:
+            self.hit_breaks(dt)
 
         # movement handeling
-        self.waiting = False
-        self.waiting_time = 0.0
+        else:
+            self.speed += self.acceleration_rate
+            self.waiting = False
+            self.waiting_time = 0.0
+
+        if car_across:
+            # self.hit_breaks(dt)
+            self.maneuver(dt)
 
         if self.speed > 0 :
             # update position based on direction using current speed
@@ -90,41 +96,32 @@ class Car:
                 self.rect.y -= self.speed * dt
             elif self.road.direction == Directions.EAST:
                 self.rect.x -= self.speed * dt
-            else: #west
+            else: # west
                 self.rect.x += self.speed * dt
 
-    def get_closest_car_ahead(self, cars):
-        closest_car = None
-        min_distance = float('inf')
-
-        for car in cars:
-            if (car is self or
-                car.road != self.road or
-                car.lane != self.lane or
-                not self.is_ahead(car)):
-                continue
-
-            distance = self.calculate_axial_distance_to(car)
-            if distance < min_distance:
-                min_distance = distance
-                closest_car = car
-        return closest_car, min_distance
-
-    def is_ahead(self, other_car):
+    def maneuver(self, dt):
+        # self.hit_breaks(dt)
         if self.road.direction == Directions.NORTH:
-            return other_car.rect.centery > self.rect.centery
-        elif self.road.direction == Directions.SOUTH:
-            return other_car.rect.centery < self.rect.centery
-        elif self.road.direction == Directions.EAST:
-            return other_car.rect.centerx < self.rect.centerx
-        elif self.road.direction == Directions.WEST:
-            return other_car.rect.centerx > self.rect.centerx
+            turn_amount = 45
+            self.angle = self.angle - turn_amount
+            angle_rad = math.radians(self.angle)
+            self.rect.x += math.sin(angle_rad) * self.speed * dt
+            self.rect.y -= math.cos(angle_rad) * self.speed * dt
 
-    def calculate_axial_distance_to(self, other_car):
-        if self.road.direction in [Directions.NORTH, Directions.SOUTH]:
-            return abs(self.rect.centery - other_car.rect.centery)
+    def car_across(self, cars):
+        for car in cars:
+            if car is not self and self.road is not car.road:
+                if self.awareness_rect.colliderect(car.rect):
+                    return True
+
+
+    def hit_breaks(self, dt):
+        if self.speed > 0:
+            self.speed -= self.deceleration_rate
         else:
-            return abs(self.rect.centerx - other_car.rect.centerx)
+            self.speed = 0
+            self.waiting = True
+            self.waiting_time += dt
 
     def need_to_stop_at_light(self, light_state):
         if light_state != Colors.RED or not self.rect.colliderect(self.road.rect):
@@ -140,10 +137,34 @@ class Car:
         elif self.road.direction == Directions.WEST:
             return self.rect.right > (self.road.stop_line - stop_distance)
 
+    def need_to_stop_car_ahead(self, cars):
+        for car in cars:
+            if car.road == self.road and car.lane == self.lane and car is not self:
+                if self.road.direction == Directions.NORTH:
+                    if self.awareness_rect.collidepoint(car.awareness_rect.midtop):
+                        return True
+                elif self.road.direction == Directions.SOUTH:
+                    if self.awareness_rect.collidepoint(car.awareness_rect.midbottom):
+                        return True
+                elif self.road.direction == Directions.EAST:
+                    if self.awareness_rect.collidepoint(car.awareness_rect.midright):
+                        return True
+                elif self.road.direction == Directions.WEST:
+                    if self.awareness_rect.collidepoint(car.awareness_rect.midleft):
+                        return True
+
+    def need_to_stop_priority(self, cars):
+        if self.rect.colliderect(self.road.after_immediate):
+            # if self.road.traffic_light.state == Colors.RED:
+                if self.car_across(cars):
+                    return True
+
     def out_of_bounds(self):
         return not self.rect.colliderect(0, 0, Sizes.WIDTH, Sizes.HEIGHT)
 
     def draw(self, screen):
         rotated = pygame.transform.rotate(self.image, self.angle)
         rect = rotated.get_rect(center=self.rect.center)
+        self.awareness_rect = self.awareness_rect_image.get_rect(center=self.rect.center)
         screen.blit(rotated, rect.topleft)
+        screen.blit(self.awareness_rect_image, self.awareness_rect)
